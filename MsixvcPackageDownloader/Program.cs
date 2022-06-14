@@ -67,20 +67,21 @@ namespace MsixvcPackageDownloader
                 if (!_updateToken.Valid)
                 {
                     if (!authService.UserToken.Valid || !authService.DeviceToken.Valid)
-                        if (await authService.AuthenticateAsync())
-                            await GetUpdateXSTSToken(authService.UserToken, authService.DeviceToken);
-                        else
+                    {
+                        if (!await authService.AuthenticateAsync())
                         {
                             Console.WriteLine("Could not regenerate update token. Please restart the app and reauthenticate!");
                             return;
                         }
+                    }
+
+                    await GetUpdateXSTSToken(authService.UserToken, authService.DeviceToken);
                 }
 
-                var contentUuid = Guid.TryParse(contentId, out var contentGuid);
-                if (!contentUuid)
+                var isValidId = Guid.TryParse(contentId, out var contentGuid);
+                if (!isValidId)
                 {
                     Console.WriteLine("Error: You entered an invalid content id.");
-                    continue;
                 }
                 else
                 {
@@ -90,21 +91,29 @@ namespace MsixvcPackageDownloader
 
                     var updateResult = await updateHttpClient.SendAsync(updateRequest);
                     if (!updateResult.IsSuccessStatusCode)
-                        Console.WriteLine(
-                            $"Failed to fetch package information. Status Code: {updateResult.StatusCode}");
+                        Console.WriteLine($"Failed to fetch package information. Status Code: {updateResult.StatusCode}");
                     else
                     {
                         try
                         {
                             var updateData = await updateResult.Content.ReadAsJsonAsync<GetBasePackageResponse>();
                             Console.WriteLine("Got response!");
-                            foreach (var file in updateData.PackageFiles.Where(pred => !pred.FileName.EndsWith(".phf") && !pred.FileName.EndsWith(".xsp"))) // PC files have the .msixvc extension, Xbox files don't have any
-                                Console.WriteLine(
-                                    $"{file.FileName} | Size: {file.FileSize} | Link: {file.CdnRootPaths[0] + file.RelativeUrl}");
+
+                            if (updateData.PackageFound)
+                            {
+                                foreach (var file in updateData.PackageFiles.Where(pred =>  // PC files have the .msixvc extension, Xbox files don't have any
+                                             !pred.FileName.EndsWith(".phf") &&
+                                             !pred.FileName.EndsWith(".xsp")))
+                                    Console.WriteLine($"{file.FileName} | Size: {file.FileSize} | Link: {file.CdnRootPaths[0] + file.RelativeUrl}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Error: Server did not find requested package.");
+                            }
                         }
                         catch (Exception e)
                         {
-                            Console.WriteLine("Error while parsing server response.");
+                            Console.WriteLine($"Error while parsing server response. {e}");
                         }
                     }
                 }
