@@ -33,7 +33,10 @@ namespace MsixvcPackageDownloader
 
             if (authService == null)
             {
-                var requestUrl = AuthenticationService.GetWindowsLiveAuthenticationUrl();
+                var requestUrl =
+                    AuthenticationService.GetWindowsLiveAuthenticationUrl(
+                        new WindowsLiveAuthenticationQuery(clientId: "00000000402b5328"));
+
                 Console.WriteLine(
                     "Please sign-in at this url in your browser, then paste the resulting URL back into this window and press enter.");
                 Console.WriteLine($"Url: {requestUrl}");
@@ -42,13 +45,8 @@ namespace MsixvcPackageDownloader
                 var response = AuthenticationService.ParseWindowsLiveResponse(resultingUrl);
 
                 authService = new AuthenticationService(response);
-                var authSuccess = await authService.AuthenticateAsync();
-
-                if (!authSuccess)
-                {
-                    Console.WriteLine("Error: Failed to authenticate!");
-                    return;
-                }
+                authService.UserToken = await AuthenticationService.AuthenticateXASUAsync(authService.AccessToken);
+                authService.XToken = await AuthenticationService.AuthenticateXSTSAsync(authService.UserToken, authService.DeviceToken, authService.TitleToken);
             }
 
             await authService.DumpToJsonFileAsync(TokenPath);
@@ -118,7 +116,6 @@ namespace MsixvcPackageDownloader
                     }
                 }
             }
-
         }
 
         public static async Task<bool> GetUpdateXSTSToken(UserToken userToken, DeviceToken deviceToken)
