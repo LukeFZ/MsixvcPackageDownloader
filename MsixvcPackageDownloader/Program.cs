@@ -42,6 +42,12 @@ namespace MsixvcPackageDownloader
                 Console.WriteLine($"Url: {requestUrl}");
 
                 var resultingUrl = Console.ReadLine();
+                if (resultingUrl == null)
+                    return;
+
+                if (!resultingUrl.Contains("refresh_token"))
+                    resultingUrl += "&refresh_token=thisisunused";
+
                 var response = AuthenticationService.ParseWindowsLiveResponse(resultingUrl);
 
                 authService = new AuthenticationService(response);
