@@ -42,17 +42,49 @@ namespace MsixvcPackageDownloader
                 Console.WriteLine($"Url: {requestUrl}");
 
                 var resultingUrl = Console.ReadLine();
-                if (resultingUrl == null)
+                if (string.IsNullOrWhiteSpace(resultingUrl))
                     return;
+
+                // Attempt to fix URL errors
+                if (!resultingUrl.Contains('#') && resultingUrl.Contains("access_token="))
+                {
+                    Console.WriteLine("Detected reference to access_token without '#', attempting to fix URL format...");
+                    if (resultingUrl.Contains("&access_token="))
+                    {
+                        resultingUrl = resultingUrl.Replace("&access_token=", "#access_token=");
+                    }
+                    else if (resultingUrl.Contains("?access_token="))
+                    {
+                        resultingUrl = resultingUrl.Replace("?access_token=", "#access_token=");
+                    }
+                }
 
                 if (!resultingUrl.Contains("refresh_token"))
                     resultingUrl += "&refresh_token=thisisunused";
 
-                var response = AuthenticationService.ParseWindowsLiveResponse(resultingUrl);
+                try
+                {
+                    var response = AuthenticationService.ParseWindowsLiveResponse(resultingUrl);
 
-                authService = new AuthenticationService(response);
-                authService.UserToken = await AuthenticationService.AuthenticateXASUAsync(authService.AccessToken);
-                authService.XToken = await AuthenticationService.AuthenticateXSTSAsync(authService.UserToken, authService.DeviceToken, authService.TitleToken);
+                    authService = new AuthenticationService(response);
+                    authService.UserToken = await AuthenticationService.AuthenticateXASUAsync(authService.AccessToken);
+                    authService.XToken = await AuthenticationService.AuthenticateXSTSAsync(authService.UserToken, authService.DeviceToken, authService.TitleToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    Console.WriteLine("CRITICAL AUTHENTICATION ERROR");
+                    Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    Console.WriteLine($"Error Message: {ex.Message}");
+                    Console.WriteLine("Full Stack Trace:");
+                    Console.WriteLine(ex.ToString());
+                    Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    Console.WriteLine();
+                    Console.WriteLine("Press any key to retry or exit...");
+                    Console.ReadLine();
+                    return;
+                }
             }
 
             await authService.DumpToJsonFileAsync(TokenPath);
